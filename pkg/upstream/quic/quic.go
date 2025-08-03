@@ -23,8 +23,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
-	"net"
 	"sync"
 
 	"github.com/miekg/dns"
@@ -48,7 +46,7 @@ type Conn struct {
 	sync.RWMutex
 }
 
-func dial(ctx context.Context, addr string, tlsConfig *tls.Config, quicConfig *quic.Config) (*Conn, error) {
+func Dial(ctx context.Context, addr string, tlsConfig *tls.Config, quicConfig *quic.Config) (*Conn, error) {
 	conn, err := quic.DialAddrEarly(ctx, addr, tlsConfig, quicConfig)
 	if err != nil {
 		return nil, err
@@ -114,18 +112,14 @@ func (c *Conn) openStreamSync(ctx context.Context) (*quic.Stream, error) {
 }
 
 type Upstream struct {
-	conn       *Conn
-	addr       string
-	tlsConfig  *tls.Config
-	quicConfig *quic.Config
+	conn     *Conn
+	dialFunc func(ctx context.Context) (*Conn, error)
 	sync.RWMutex
 }
 
-func NewQUICUpstream(addr string, tlsConfig *tls.Config, quicConfig *quic.Config) *Upstream {
+func NewQUICUpstream(addr string, dialFunc func(ctx context.Context) (*Conn, error)) *Upstream {
 	return &Upstream{
-		addr:       addr,
-		tlsConfig:  tlsConfig,
-		quicConfig: quicConfig,
+		dialFunc: dialFunc,
 	}
 }
 
@@ -142,17 +136,7 @@ func (h *Upstream) offer(ctx context.Context) (*Conn, error) {
 	if outer != nil && outer.isActive() {
 		return outer, nil
 	}
-	var dialer net.Dialer
-	rawConn, err := dialer.DialContext(ctx, "udp", h.addr)
-	if err != nil {
-		return nil, err
-	}
-	rawConn.Close()
-	udpConn, ok := rawConn.(*net.UDPConn)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type %T", rawConn)
-	}
-	conn, err := dial(ctx, udpConn.RemoteAddr().String(), h.tlsConfig, h.quicConfig)
+	conn, err := h.dialFunc(ctx)
 	if err != nil {
 		return nil, err
 	}

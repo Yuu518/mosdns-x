@@ -238,13 +238,25 @@ func NewUpstream(addr string, opt *Opt) (Upstream, error) {
 		tlsConfig.NextProtos = []string{"doq"}
 
 		dialAddr := getDialAddrWithPort(addrURL.Host, opt.DialAddr, 853)
-		return mQUIC.NewQUICUpstream(dialAddr, tlsConfig, &quic.Config{
+		quicConfig := &quic.Config{
 			TokenStore:                     quic.NewLRUTokenStore(1, 10),
 			InitialStreamReceiveWindow:     4 * 1024,
 			MaxStreamReceiveWindow:         4 * 1024,
 			InitialConnectionReceiveWindow: 8 * 1024,
 			MaxConnectionReceiveWindow:     64 * 1024,
 			KeepAlivePeriod:                time.Second * 20,
+		}
+		return mQUIC.NewQUICUpstream(dialAddr, func(ctx context.Context) (*mQUIC.Conn, error) {
+			conn, err := dialer.DialContext(ctx, "udp", dialAddr)
+			if err != nil {
+				return nil, err
+			}
+			conn.Close()
+			udpConn, isUDPConn := conn.(*net.UDPConn)
+			if !isUDPConn {
+				return nil, fmt.Errorf("this is not an udp conn")
+			}
+			return mQUIC.Dial(ctx, udpConn.RemoteAddr().String(), tlsConfig, quicConfig)
 		}), nil
 	case "https":
 		idleConnTimeout := time.Second * 30
@@ -278,11 +290,15 @@ func NewUpstream(addr string, opt *Opt) (Upstream, error) {
 					KeepAlivePeriod:                time.Second * 20,
 				},
 				DialFunc: func(ctx context.Context, _ string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
-					ua, err := net.ResolveUDPAddr("udp", dialAddr)
+					conn, err := dialer.DialContext(ctx, "udp", dialAddr)
 					if err != nil {
 						return nil, err
 					}
-					return quic.DialEarly(ctx, conn, ua, tlsCfg, cfg)
+					udpConn, isUDPConn := conn.(*net.UDPConn)
+					if !isUDPConn {
+						return nil, fmt.Errorf("this is not an udp conn")
+					}
+					return quic.DialAddrEarly(ctx, udpConn.RemoteAddr().String(), tlsCfg, cfg)
 				},
 			}
 		} else {
