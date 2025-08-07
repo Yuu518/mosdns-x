@@ -65,6 +65,7 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	gitlab.com/go-extension/aes-ccm v0.0.0-20230221065045-e58665ef23c7 // indirect
 	gitlab.com/go-extension/hpke v0.0.0-20250212195157-716075a00b8a // indirect
+	gitlab.com/go-extension/http v0.0.0-20250719151615-08a618538a4f // indirect
 	gitlab.com/go-extension/mlkem768 v0.0.0-20240814071630-937354a2177e // indirect
 	gitlab.com/go-extension/rand v0.0.0-20240303103951-707937a049b5 // indirect
 	gitlab.com/go-extension/utils v0.0.0-20250718194058-bae8b5a74647 // indirect
