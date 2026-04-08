@@ -8,15 +8,10 @@ jobs:
   build-release:
     runs-on: ubuntu-24.04
     steps:
-      - name: get latest go version
-        id: go
-        run: |
-          echo version=1.25.5 >> $GITHUB_OUTPUT
-
       - name: Set up Go
-        uses: actions/setup-go@v5.5.0
+        uses: actions/setup-go@v6
         with:
-          go-version: ${{steps.go.outputs.version}}
+          go-version: 1.25.x
           cache: false
 
       - uses: actions/checkout@v4.2.2
