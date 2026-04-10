@@ -4,7 +4,8 @@
 *.dll
 *.so
 *.dylib
-
+mosdns-x
+mosdns
 # Test binary, built with `go test -c`
 *.test
 
@@ -20,6 +21,7 @@ release/
 # ide
 .vscode/
 .idea/
+.claude
 
 # test utils
 testutils/
