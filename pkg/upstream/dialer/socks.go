@@ -138,8 +138,7 @@ func (s *SocksAddr) NetAddr() net.Addr {
 	if len(s.fqdn) == 0 {
 		return net.UDPAddrFromAddrPort(netip.AddrPortFrom(s.addr, s.port))
 	} else {
-		addr := UDPFqdnAddr(s.String())
-		return &addr
+		return new(UDPFqdnAddr(s.String()))
 	}
 }
 

@@ -88,8 +88,7 @@ func (s *SocksPacketConn) unpack(b []byte) ([]byte, net.Addr, error) {
 		}
 		fqdn := string(s.cache[5 : 5+addrLen])
 		port := binary.BigEndian.Uint16(s.cache[5+addrLen : 7+addrLen])
-		fqdnAddr := UDPFqdnAddr(fmt.Sprintf("%s:%d", fqdn, port))
-		return b[7+addrLen:], &fqdnAddr, nil
+		return b[7+addrLen:], new(UDPFqdnAddr(fmt.Sprintf("%s:%d", fqdn, port))), nil
 	case TypeIPv6:
 		if len(b) < 22 {
 			return nil, nil, fmt.Errorf("ipv6 address incomplete")
