@@ -23,8 +23,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"net"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -47,8 +49,18 @@ var bufPool = sync.Pool{
 }
 
 type pendingEntry struct {
-	ch       chan *dns.Msg
-	deadline time.Time
+	ch          chan *dns.Msg
+	deadline    time.Time
+	question    dns.Question
+	hasQuestion bool
+}
+
+func (e *pendingEntry) matches(msg *dns.Msg) bool {
+	if !e.hasQuestion || len(msg.Question) == 0 {
+		return true
+	}
+	q := msg.Question[0]
+	return q.Qtype == e.question.Qtype && q.Qclass == e.question.Qclass && strings.EqualFold(q.Name, e.question.Name)
 }
 
 type Upstream struct {
@@ -66,7 +78,6 @@ type Upstream struct {
 	wakeup    chan struct{}
 
 	writeMu sync.Mutex
-	rr      uint32
 	closed  int32
 }
 
@@ -215,7 +226,7 @@ func (u *Upstream) reader(conn net.Conn) {
 		if n > 0 {
 			msg := new(dns.Msg)
 			if err := msg.Unpack(b[:n]); err == nil {
-				u.removePendingAndNotify(msg.Id, msg)
+				u.deliver(msg)
 			}
 		}
 	}
@@ -273,26 +284,51 @@ func (u *Upstream) removePendingAndNotify(id uint16, msg *dns.Msg) {
 	}
 }
 
-func (u *Upstream) claimID() (uint16, chan *dns.Msg, error) {
+func (u *Upstream) claimID(q *dns.Msg) (uint16, chan *dns.Msg, error) {
+	entry := &pendingEntry{
+		ch:       make(chan *dns.Msg, 2),
+		deadline: time.Now().Add(pendingTTL),
+	}
+	if len(q.Question) > 0 {
+		entry.question = q.Question[0]
+		entry.hasQuestion = true
+	}
+
+	start := uint16(rand.Uint32())
+	u.pendingMu.Lock()
+	defer u.pendingMu.Unlock()
 	for i := 0; i < 65536; i++ {
-		id := uint16(atomic.AddUint32(&u.rr, 1) & 0xffff)
-		u.pendingMu.Lock()
-		if _, exists := u.pending[id]; !exists {
-			ch := make(chan *dns.Msg, 2)
-			u.pending[id] = &pendingEntry{
-				ch:       ch,
-				deadline: time.Now().Add(pendingTTL),
-			}
-			select {
-			case u.wakeup <- struct{}{}:
-			default:
-			}
-			u.pendingMu.Unlock()
-			return id, ch, nil
+		id := start + uint16(i)
+		if _, exists := u.pending[id]; exists {
+			continue
 		}
-		u.pendingMu.Unlock()
+		u.pending[id] = entry
+		select {
+		case u.wakeup <- struct{}{}:
+		default:
+		}
+		return id, entry.ch, nil
 	}
 	return 0, nil, errors.New("no free dns id available")
+}
+
+func (u *Upstream) deliver(msg *dns.Msg) {
+	if !msg.Response {
+		return
+	}
+	u.pendingMu.Lock()
+	entry, ok := u.pending[msg.Id]
+	if !ok || !entry.matches(msg) {
+		u.pendingMu.Unlock()
+		return
+	}
+	delete(u.pending, msg.Id)
+	u.pendingMu.Unlock()
+
+	select {
+	case entry.ch <- msg:
+	default:
+	}
 }
 
 func (u *Upstream) unclaimID(id uint16) {
@@ -313,7 +349,7 @@ func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 		return nil, err
 	}
 
-	id, respCh, err := u.claimID()
+	id, respCh, err := u.claimID(q)
 	if err != nil {
 		return nil, err
 	}
