@@ -185,6 +185,11 @@ func exchange(ctx context.Context, conn *Conn, q *dns.Msg) (*dns.Msg, error) {
 	if err != nil {
 		return nil, err
 	}
+	stop := context.AfterFunc(ctx, func() {
+		stream.CancelRead(1)
+		stream.CancelWrite(1)
+	})
+	defer stop()
 	_, err = dnsutils.WriteMsgToTCP(stream, q)
 	if err != nil {
 		stream.CancelRead(1)
