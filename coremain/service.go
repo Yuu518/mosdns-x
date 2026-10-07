@@ -134,7 +134,7 @@ func newSvcStartCmd() *cobra.Command {
 			time.Sleep(time.Second)
 			s, err := svc.Status()
 			if err != nil {
-				mlog.S().Warn("cannot get service status, %w", err)
+				mlog.S().Warnf("cannot get service status, %v", err)
 			} else {
 				switch s {
 				case service.StatusRunning:
