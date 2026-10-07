@@ -125,7 +125,7 @@ func (s *Server) ServeQUIC(l *quic.EarlyListener) error {
 
 					if req.Id != 0 {
 						stream.CancelWrite(1)
-						closer.close(1)
+						closer.close(2)
 						return
 					}
 
