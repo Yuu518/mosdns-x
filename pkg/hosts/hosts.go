@@ -72,9 +72,6 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 	r.RecursionAvailable = true
 	switch {
 	case typ == dns.TypeA && len(ipv4) > 0:
-		rand.Shuffle(len(ipv4), func(i, j int) {
-			ipv4[i], ipv4[j] = ipv4[j], ipv4[i]
-		})
 		for _, ip := range ipv4 {
 			rr := &dns.A{
 				Hdr: dns.RR_Header{
@@ -88,9 +85,6 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 			r.Answer = append(r.Answer, rr)
 		}
 	case typ == dns.TypeAAAA && len(ipv6) > 0:
-		rand.Shuffle(len(ipv6), func(i, j int) {
-			ipv6[i], ipv6[j] = ipv6[j], ipv6[i]
-		})
 		for _, ip := range ipv6 {
 			rr := &dns.AAAA{
 				Hdr: dns.RR_Header{
@@ -104,6 +98,9 @@ func (h *Hosts) LookupMsg(m *dns.Msg) *dns.Msg {
 			r.Answer = append(r.Answer, rr)
 		}
 	}
+	rand.Shuffle(len(r.Answer), func(i, j int) {
+		r.Answer[i], r.Answer[j] = r.Answer[j], r.Answer[i]
+	})
 
 	// Append fake SOA record for empty reply.
 	if len(r.Answer) == 0 {
