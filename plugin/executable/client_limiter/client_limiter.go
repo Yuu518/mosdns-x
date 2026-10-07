@@ -91,7 +91,7 @@ func (l *Limiter) Close() error {
 	l.closeOnce.Do(func() {
 		close(l.closeNotify)
 	})
-	return nil
+	return l.hpLimiter.Close()
 }
 
 func (l *Limiter) cleanerLoop() {

@@ -49,8 +49,9 @@ type serverService struct {
 func (ss *serverService) Start(s service.Service) error {
 	mlog.L().Info("starting service", zap.String("platform", s.Platform()))
 	go func() {
-		err := StartServer(ss.f)
-		mlog.L().Fatal("server exited", zap.Error(err))
+		if err := StartServer(ss.f); err != nil {
+			mlog.L().Fatal("server exited", zap.Error(err))
+		}
 	}()
 	return nil
 }

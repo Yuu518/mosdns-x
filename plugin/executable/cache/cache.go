@@ -323,6 +323,6 @@ func (c *cachePlugin) tryStoreMsg(key string, r *dns.Msg) error {
 	return nil
 }
 
-func (c *cachePlugin) Shutdown() error {
+func (c *cachePlugin) Close() error {
 	return c.backend.Close()
 }

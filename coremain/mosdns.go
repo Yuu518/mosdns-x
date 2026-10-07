@@ -24,8 +24,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/pprof"
+	"os"
+	"os/signal"
 	"runtime"
 	"runtime/debug"
+	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,6 +49,7 @@ type Mosdns struct {
 	dataManager *data_provider.DataManager
 
 	// Plugins
+	plugins  []Plugin
 	execs    map[string]executable_seq.Executable
 	matchers map[string]executable_seq.Matcher
 
@@ -166,13 +170,27 @@ func RunMosdns(cfg *Config) error {
 		runtime.GC()
 		debug.FreeOSMemory()
 	})
-	<-m.sc.ReceiveCloseSignal()
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigChan)
+	select {
+	case sig := <-sigChan:
+		m.logger.Info("received signal, shutting down", zap.Stringer("signal", sig))
+		m.sc.SendCloseSignal(nil)
+	case <-m.sc.ReceiveCloseSignal():
+	}
 	m.sc.Done()
 	m.sc.CloseWait()
+	for _, p := range m.plugins {
+		if err := p.Close(); err != nil {
+			m.logger.Warn("failed to close plugin", zap.String("tag", p.Tag()), zap.Error(err))
+		}
+	}
 	return m.sc.Err()
 }
 
 func (m *Mosdns) addPlugin(p Plugin) {
+	m.plugins = append(m.plugins, p)
 	t := p.Tag()
 	if p, ok := p.(ExecutablePlugin); ok {
 		m.execs[t] = p
