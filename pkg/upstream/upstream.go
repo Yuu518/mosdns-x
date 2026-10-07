@@ -46,6 +46,7 @@ import (
 	mQUIC "github.com/pmkol/mosdns-x/pkg/upstream/quic"
 	"github.com/pmkol/mosdns-x/pkg/upstream/transport"
 	"github.com/pmkol/mosdns-x/pkg/upstream/udp"
+	"github.com/pmkol/mosdns-x/pkg/utils"
 )
 
 // Upstream represents a DNS upstream.
@@ -317,8 +318,7 @@ func createTLSConfig(opt *Opt, alpn string, serverName string) *tls.Config {
 
 func createETLSConfig(opt *Opt, alpn string, serverName string) *eTLS.Config {
 	config := &eTLS.Config{
-		KernelTX:           opt.KernelTX,
-		KernelRX:           opt.KernelRX,
+		KernelOptions:      utils.ETLSKernelOptions(opt.KernelTX, opt.KernelRX),
 		InsecureSkipVerify: opt.Insecure,
 		RootCAs:            opt.RootCAs,
 		NextProtos:         []string{alpn},

@@ -29,6 +29,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/quic-go/quic-go"
 	eTLS "gitlab.com/go-extension/tls"
+
+	"github.com/pmkol/mosdns-x/pkg/utils"
 )
 
 type cert[T tls.Certificate | eTLS.Certificate] struct {
@@ -146,8 +148,7 @@ func (s *Server) CreateETLSListner(l net.Listener, nextProtos []string) (net.Lis
 		return nil, err
 	}
 	return eTLS.NewListener(l, &eTLS.Config{
-		KernelTX:       s.opts.KernelTX,
-		KernelRX:       s.opts.KernelRX,
+		KernelOptions:  utils.ETLSKernelOptions(s.opts.KernelTX, s.opts.KernelRX),
 		AllowEarlyData: true,
 		MaxEarlyData:   4096,
 		NextProtos:     nextProtos,
