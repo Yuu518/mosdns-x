@@ -64,6 +64,7 @@ func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 	if res.StatusCode != 200 {
 		return nil, fmt.Errorf("unexpected status %v: %s", res.StatusCode, res.Status)
 	}
@@ -75,7 +76,6 @@ func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 			return nil, fmt.Errorf("empty response")
 		}
 	}
-	defer res.Body.Close()
 	bb := bufPool.Get()
 	defer bufPool.Release(bb)
 	_, err = bb.ReadFrom(res.Body)
