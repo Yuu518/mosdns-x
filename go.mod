@@ -12,13 +12,14 @@ require (
 	github.com/kardianos/service v1.3.0
 	github.com/miekg/dns v1.1.73
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/nadoo/ipset v0.5.0
 	github.com/pires/go-proxyproto v0.15.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/quic-go/quic-go v0.63.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1
+	github.com/vishvananda/netlink v1.3.1
+	github.com/vishvananda/netns v0.0.5
 	gitlab.com/go-extension/http v0.0.0-20260927175113-97f862b2fbc7
 	gitlab.com/go-extension/tls v0.0.0-20260930085040-3ec16e7404b9
 	go.uber.org/zap v1.28.0
@@ -30,8 +31,6 @@ require (
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 )
-
-replace github.com/nadoo/ipset v0.5.0 => github.com/IrineSistiana/ipset v0.5.1-0.20220703061533-6e0fc3b04c0a
 
 require (
 	github.com/RyuaNerin/go-krypto v1.3.0 // indirect
