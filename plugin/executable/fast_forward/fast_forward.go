@@ -162,7 +162,6 @@ type upstreamWrapper struct {
 }
 
 func (u *upstreamWrapper) Exchange(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
-	q.Compress = true
 	return u.u.ExchangeContext(ctx, q)
 }
 
@@ -187,6 +186,7 @@ func (f *fastForward) Exec(ctx context.Context, qCtx *query_context.Context, nex
 }
 
 func (f *fastForward) exec(ctx context.Context, qCtx *query_context.Context) (err error) {
+	qCtx.Q().Compress = true
 	r, err := bundled_upstream.ExchangeParallel(ctx, qCtx, f.upstreamWrappers, f.L())
 	if err != nil {
 		return err

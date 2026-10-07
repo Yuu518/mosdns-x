@@ -150,7 +150,8 @@ func (h *Upstream) Close() error {
 }
 
 func (h *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
-	q.Id = 0
+	qc := *q
+	qc.Id = 0
 	var err error
 	for range 3 {
 		var conn *Conn
@@ -159,9 +160,10 @@ func (h *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 			return nil, err
 		}
 		var resp *dns.Msg
-		resp, err = exchangeMsg(ctx, conn, q)
+		resp, err = exchangeMsg(ctx, conn, &qc)
 		if err == nil {
-			return resp, err
+			resp.Id = q.Id
+			return resp, nil
 		}
 	}
 	return nil, err

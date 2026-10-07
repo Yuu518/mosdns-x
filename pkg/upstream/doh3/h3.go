@@ -51,8 +51,9 @@ func NewUpstream(url *url.URL, transport *http3.Transport) *Upstream {
 func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	q.Id = 0
-	wire, buf, err := pool.PackBuffer(q)
+	qc := *q
+	qc.Id = 0
+	wire, buf, err := pool.PackBuffer(&qc)
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +92,7 @@ func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 	if err != nil {
 		return nil, err
 	}
+	r.Id = q.Id
 	return r, nil
 }
 
