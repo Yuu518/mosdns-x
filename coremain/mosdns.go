@@ -147,8 +147,9 @@ func RunMosdns(cfg *Config) error {
 	// Start http api server
 	if httpAddr := cfg.API.HTTP; len(httpAddr) > 0 {
 		httpServer := &http.Server{
-			Addr:    httpAddr,
-			Handler: m.httpAPIMux,
+			Addr:              httpAddr,
+			Handler:           m.httpAPIMux,
+			ReadHeaderTimeout: time.Second * 5,
 		}
 		m.sc.Attach(func(done func(), closeSignal <-chan struct{}) {
 			defer done()
