@@ -100,9 +100,6 @@ func (p *ParallelNode) exec(ctx context.Context, qCtx *query_context.Context) er
 		if p.timeout > 0 {
 			pCtx, cancel = context.WithTimeout(context.Background(), p.timeout)
 		} else {
-			if ddl, ok := ctx.Deadline(); ok {
-				pCtx, cancel = context.WithDeadline(ctx, ddl)
-			}
 			pCtx, cancel = context.WithTimeout(ctx, defaultParallelTimeout)
 		}
 
