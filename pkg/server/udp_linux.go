@@ -126,7 +126,7 @@ func newCmc(c *net.UDPConn) (cmcUDPConn, error) {
 			controlErr = fmt.Errorf("socket protocol %d is not supported", v)
 		}
 	}); err != nil {
-		return nil, fmt.Errorf("control fd err, %w", controlErr)
+		return nil, fmt.Errorf("control fd err, %w", err)
 	}
 
 	if controlErr != nil {
