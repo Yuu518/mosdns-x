@@ -35,7 +35,7 @@ const (
 )
 
 func init() {
-	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(*Args) })
+	coremain.RegNewPluginFunc(PluginType, Init, func() interface{} { return new(Args) })
 	coremain.RegNewPersetPluginFunc("_query_summary", func(bp *coremain.BP) (coremain.Plugin, error) {
 		return newLogger(bp, &Args{}), nil
 	})
