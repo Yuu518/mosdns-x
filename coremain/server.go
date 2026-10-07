@@ -128,8 +128,8 @@ func (m *Mosdns) startServerListener(cfg *ServerListenerConfig, dnsHandler D.Han
 				os.Remove(cfg.Addr)
 			}
 			conn, err = config.ListenPacket(ctx, "unixgram", cfg.Addr)
-			if !abstract {
-				os.Chmod(cfg.Addr, 0x777)
+			if err == nil && !abstract {
+				os.Chmod(cfg.Addr, 0o777)
 			}
 		} else {
 			conn, err = config.ListenPacket(ctx, "udp", cfg.Addr)
@@ -161,8 +161,8 @@ func (m *Mosdns) startServerListener(cfg *ServerListenerConfig, dnsHandler D.Han
 				os.Remove(cfg.Addr)
 			}
 			l, err = config.Listen(ctx, "unix", cfg.Addr)
-			if !abstract {
-				os.Chmod(cfg.Addr, 0x777)
+			if err == nil && !abstract {
+				os.Chmod(cfg.Addr, 0o777)
 			}
 		} else {
 			l, err = config.Listen(ctx, "tcp", cfg.Addr)
