@@ -138,7 +138,7 @@ func GenEmptyReply(q *dns.Msg, rcode int) *dns.Msg {
 	r.RecursionAvailable = true
 
 	var name string
-	if len(q.Question) > 1 {
+	if len(q.Question) > 0 {
 		name = q.Question[0].Name
 	} else {
 		name = "."
