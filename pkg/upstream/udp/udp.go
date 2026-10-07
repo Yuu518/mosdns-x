@@ -51,6 +51,7 @@ var bufPool = sync.Pool{
 type pendingEntry struct {
 	ch          chan *dns.Msg
 	deadline    time.Time
+	conn        net.Conn
 	question    dns.Question
 	hasQuestion bool
 }
@@ -108,6 +109,10 @@ func (u *Upstream) Close() error {
 	}
 	u.mu.Unlock()
 
+	if u.tcpTransport != nil {
+		_ = u.tcpTransport.Close()
+	}
+
 	select {
 	case u.wakeup <- struct{}{}:
 	default:
@@ -136,7 +141,7 @@ func (u *Upstream) Close() error {
 	return nil
 }
 
-func (u *Upstream) ensureConn(ctx context.Context) error {
+func (u *Upstream) ensureConn(ctx context.Context) (err error) {
 	for {
 		u.mu.Lock()
 		if atomic.LoadInt32(&u.closed) == 1 {
@@ -164,7 +169,6 @@ func (u *Upstream) ensureConn(ctx context.Context) error {
 			}()
 
 			var conn net.Conn
-			var err error
 
 			defer func() {
 				if r := recover(); r != nil {
@@ -242,22 +246,18 @@ func (u *Upstream) handleConnClosed(conn net.Conn, _ error) {
 	u.mu.Unlock()
 
 	u.pendingMu.Lock()
-	snapshot := make([]struct {
-		id    uint16
-		entry *pendingEntry
-	}, 0, len(u.pending))
+	var failed []*pendingEntry
 	for id, entry := range u.pending {
-		snapshot = append(snapshot, struct {
-			id    uint16
-			entry *pendingEntry
-		}{id, entry})
+		if entry.conn == conn {
+			delete(u.pending, id)
+			failed = append(failed, entry)
+		}
 	}
-	u.pending = make(map[uint16]*pendingEntry)
 	u.pendingMu.Unlock()
 
-	for _, it := range snapshot {
+	for _, entry := range failed {
 		select {
-		case it.entry.ch <- nil:
+		case entry.ch <- nil:
 		default:
 		}
 	}
@@ -284,10 +284,11 @@ func (u *Upstream) removePendingAndNotify(id uint16, msg *dns.Msg) {
 	}
 }
 
-func (u *Upstream) claimID(q *dns.Msg) (uint16, chan *dns.Msg, error) {
+func (u *Upstream) claimID(q *dns.Msg, conn net.Conn) (uint16, chan *dns.Msg, error) {
 	entry := &pendingEntry{
 		ch:       make(chan *dns.Msg, 2),
 		deadline: time.Now().Add(pendingTTL),
+		conn:     conn,
 	}
 	if len(q.Question) > 0 {
 		entry.question = q.Question[0]
@@ -349,18 +350,18 @@ func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 		return nil, err
 	}
 
-	id, respCh, err := u.claimID(q)
-	if err != nil {
-		return nil, err
-	}
-	defer u.unclaimID(id)
-
 	u.mu.Lock()
 	conn := u.conn
 	u.mu.Unlock()
 	if conn == nil {
 		return nil, errors.New("udp connection closed")
 	}
+
+	id, respCh, err := u.claimID(q, conn)
+	if err != nil {
+		return nil, err
+	}
+	defer u.unclaimID(id)
 
 	u.writeMu.Lock()
 	var dlSet bool
@@ -378,12 +379,12 @@ func (u *Upstream) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, e
 
 	if err != nil {
 		u.mu.Lock()
-		if u.conn != nil {
-			_ = u.conn.Close()
+		if u.conn == conn {
 			u.conn = nil
 			u.readerOn = false
 		}
 		u.mu.Unlock()
+		_ = conn.Close()
 		return nil, err
 	}
 
