@@ -283,7 +283,7 @@ func (c *cachePlugin) doLazyUpdate(msgKey string, qCtx *query_context.Context, n
 		r := lazyQCtx.R()
 		if r != nil {
 			if err := c.tryStoreMsg(msgKey, r); err != nil {
-				c.L().Error("cache store", qCtx.InfoField(), zap.Error(err))
+				c.L().Error("cache store", lazyQCtx.InfoField(), zap.Error(err))
 			}
 		}
 		c.L().Debug("lazy cache updated", lazyQCtx.InfoField())
