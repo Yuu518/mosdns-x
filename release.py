@@ -4,6 +4,7 @@ import datetime
 import logging
 import os
 import subprocess
+import sys
 import zipfile
 
 parser = argparse.ArgumentParser()
@@ -54,7 +55,7 @@ def go_build():
     logger.info(f'building {PROJECT_NAME}')
 
     global envs
-    if args.i:
+    if args.i is not None:
         envs = [envs[args.i]]
 
     VERSION = f'4.6.0'
@@ -67,6 +68,7 @@ def go_build():
         logger.exception('failed to generate config template')
         raise
 
+    failed = []
     for env in envs:
         os_env = os.environ.copy()  # new env
 
@@ -101,8 +103,14 @@ def go_build():
 
         except subprocess.CalledProcessError as e:
             logger.error(f'build {zip_filename} failed: {e.args}')
+            failed.append(zip_filename)
         except Exception:
             logger.exception('unknown err')
+            failed.append(zip_filename)
+
+    if failed:
+        logger.error(f'failed targets: {", ".join(failed)}')
+        sys.exit(1)
 
 
 if __name__ == '__main__':
