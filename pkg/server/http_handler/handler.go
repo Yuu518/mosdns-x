@@ -192,7 +192,7 @@ func (h *Handler) ServeHTTP(w ResponseWriter, req Request) {
 			return
 		}
 
-		b, err = io.ReadAll(req.Body())
+		b, err = io.ReadAll(io.LimitReader(req.Body(), dns.MaxMsgSize))
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("invalid request body"))
