@@ -1,0 +1,55 @@
+name: Build mosdns-x
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        jobs:
+          - { goos: linux, goarch: amd64, goamd64: v1, output: amd64 }
+          - { goos: linux, goarch: amd64, goamd64: v3, output: amd64-v3 }
+          - { goos: linux, goarch: arm64, output: arm64 }
+
+    env:
+      GOOS: ${{ matrix.jobs.goos }}
+      GOARM: ${{ matrix.jobs.goarm }}
+      GOARCH: ${{ matrix.jobs.goarch }}
+      GOAMD64: ${{ matrix.jobs.goamd64 }}
+      CGO_ENABLED: '0'
+      TZ: Asia/Taipei
+      VERSION: '4.6.0'
+      SUFFIX: ${{ matrix.jobs.goos == 'windows' && '.exe' || '' }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Generate config template
+        run: |
+          mkdir -p dist
+          GOOS=linux GOARCH=amd64 GOAMD64=v1 go run ./ config gen dist/config.yaml
+
+      - name: Build
+        run: |
+          go build -ldflags "-s -w -buildid= -X github.com/pmkol/mosdns-x/constant.Version=${VERSION} -X github.com/pmkol/mosdns-x/constant.BuildTime=$(date +'%y.%m.%d')" -trimpath -o "dist/mosdns${SUFFIX}" ./
+          cp README.md LICENSE dist/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mosdns-${{ env.GOOS }}-${{ matrix.jobs.output }}
+          path: dist/*
+          if-no-files-found: error
