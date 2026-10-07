@@ -21,9 +21,10 @@ package server
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"net"
+	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -34,7 +35,11 @@ import (
 )
 
 type cert[T tls.Certificate | eTLS.Certificate] struct {
-	c *T
+	p atomic.Pointer[T]
+}
+
+func (c *cert[T]) get() *T {
+	return c.p.Load()
 }
 
 func calculateTimeUntilMidnight() time.Duration {
@@ -48,25 +53,11 @@ func tryCreateWatchCert[T tls.Certificate | eTLS.Certificate](certFile string, k
 	if err != nil {
 		return nil, err
 	}
-	cc := &cert[T]{&c}
-	checkAndReloadCert := func() {
-		var certBytes [][]byte
-		switch c := any(cc.c).(type) {
-		case *tls.Certificate:
-			certBytes = c.Certificate
-		case *eTLS.Certificate:
-			certBytes = c.Certificate
-		}
-		if len(certBytes) > 0 {
-			if x509Cert, err := x509.ParseCertificate(certBytes[0]); err == nil {
-				now := time.Now()
-				expiryThreshold := now.Add(72 * time.Hour)
-				if x509Cert.NotAfter.Before(expiryThreshold) {
-					if newCert, err := createFunc(certFile, keyFile); err == nil {
-						cc.c = &newCert
-					}
-				}
-			}
+	cc := new(cert[T])
+	cc.p.Store(&c)
+	reload := func() {
+		if c, err := createFunc(certFile, keyFile); err == nil {
+			cc.p.Store(&c)
 		}
 	}
 	go func() {
@@ -75,41 +66,39 @@ func tryCreateWatchCert[T tls.Certificate | eTLS.Certificate](certFile string, k
 			return
 		}
 		defer watcher.Close()
-		_ = watcher.Add(certFile)
-		_ = watcher.Add(keyFile)
-		var timer *time.Timer
+		certDir, keyDir := filepath.Dir(certFile), filepath.Dir(keyFile)
+		_ = watcher.Add(certDir)
+		if keyDir != certDir {
+			_ = watcher.Add(keyDir)
+		}
+		certName, keyName := filepath.Base(certFile), filepath.Base(keyFile)
+
+		reloadTimer := time.NewTimer(time.Hour)
+		reloadTimer.Stop()
+		defer reloadTimer.Stop()
 		dailyCheckTimer := time.NewTimer(calculateTimeUntilMidnight())
 		defer dailyCheckTimer.Stop()
 		for {
 			select {
 			case e, ok := <-watcher.Events:
 				if !ok {
-					if timer != nil {
-						timer.Stop()
-						timer = nil
-					}
 					return
 				}
-				if e.Has(fsnotify.Chmod) || e.Has(fsnotify.Remove) {
+				if e.Op == fsnotify.Chmod {
 					continue
 				}
-				if timer == nil {
-					timer = time.AfterFunc(time.Second, func() {
-						timer = nil
-						if c, err := createFunc(certFile, keyFile); err == nil {
-							cc.c = &c
-						}
-					})
-				} else {
-					timer.Reset(time.Second)
+				if name := filepath.Base(e.Name); name != certName && name != keyName {
+					continue
 				}
-			case err := <-watcher.Errors:
-				if err != nil && timer != nil {
-					timer.Stop()
-					timer = nil
+				reloadTimer.Reset(time.Second)
+			case _, ok := <-watcher.Errors:
+				if !ok {
+					return
 				}
+			case <-reloadTimer.C:
+				reload()
 			case <-dailyCheckTimer.C:
-				checkAndReloadCert()
+				reload()
 				dailyCheckTimer.Reset(calculateTimeUntilMidnight())
 			}
 		}
@@ -128,7 +117,7 @@ func (s *Server) CreateQUICListner(conn net.PacketConn, nextProtos []string) (*q
 	return quic.ListenEarly(conn, &tls.Config{
 		NextProtos: nextProtos,
 		GetCertificate: func(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {
-			return c.c, nil
+			return c.get(), nil
 		},
 	}, &quic.Config{
 		Allow0RTT:                      true,
@@ -154,10 +143,10 @@ func (s *Server) CreateETLSListner(l net.Listener, nextProtos []string) (net.Lis
 		NextProtos:     nextProtos,
 		Defaults: eTLS.Defaults{
 			AllSecureCipherSuites: true,
-			AllSecureCurves: true,
+			AllSecureCurves:       true,
 		},
 		GetCertificate: func(_ *eTLS.ClientHelloInfo) (*eTLS.Certificate, error) {
-			return c.c, nil
+			return c.get(), nil
 		},
 	}), nil
 }
