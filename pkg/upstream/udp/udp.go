@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -464,43 +463,4 @@ func (u *Upstream) pendingJanitor() {
 		case <-ch:
 		}
 	}
-}
-
-type UpstreamPool struct {
-	upstreams []*Upstream
-	next      uint32
-}
-
-func NewUpstreamPool(dialFunc func(ctx context.Context) (net.Conn, error), tcpTransport *transport.Transport) (*UpstreamPool, error) {
-	num := runtime.NumCPU() * 2
-	pool := &UpstreamPool{
-		upstreams: make([]*Upstream, num),
-	}
-	for i := 0; i < num; i++ {
-		u, err := NewUDPUpstream(dialFunc, tcpTransport)
-		if err != nil {
-			for j := 0; j < i; j++ {
-				_ = pool.upstreams[j].Close()
-			}
-			return nil, err
-		}
-		pool.upstreams[i] = u
-	}
-	return pool, nil
-}
-
-func (p *UpstreamPool) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
-	i := atomic.AddUint32(&p.next, 1)
-	u := p.upstreams[i%uint32(len(p.upstreams))]
-	return u.ExchangeContext(ctx, q)
-}
-
-func (p *UpstreamPool) Close() error {
-	var firstErr error
-	for _, u := range p.upstreams {
-		if err := u.Close(); err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return firstErr
 }

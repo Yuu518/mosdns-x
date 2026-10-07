@@ -347,25 +347,3 @@ func tryRemovePort(s string) string {
 	}
 	return host
 }
-
-type udpWithFallback struct {
-	u *transport.Transport
-	t *transport.Transport
-}
-
-func (u *udpWithFallback) ExchangeContext(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
-	m, err := u.u.ExchangeContext(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	if m.Truncated {
-		return u.t.ExchangeContext(ctx, q)
-	}
-	return m, nil
-}
-
-func (u *udpWithFallback) Close() error {
-	u.u.Close()
-	u.t.Close()
-	return nil
-}
