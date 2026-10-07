@@ -22,6 +22,7 @@ package data_provider
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -167,88 +168,62 @@ func (ds *DataProvider) startFsWatcher() error {
 	if err != nil {
 		return err
 	}
-	if err := w.Add(ds.file); err != nil {
+	if err := w.Add(filepath.Dir(ds.file)); err != nil {
+		w.Close()
 		return err
 	}
+	name := filepath.Base(ds.file)
 
 	go func() {
 		defer w.Close()
 
-		var delayReloadTimer *time.Timer
+		reloadTimer := time.NewTimer(time.Hour)
+		reloadTimer.Stop()
+		defer reloadTimer.Stop()
 		for {
 			select {
 			case e, ok := <-w.Events:
 				if !ok {
-					if delayReloadTimer != nil {
-						delayReloadTimer.Stop()
-						delayReloadTimer = nil
-					}
 					return
+				}
+				if filepath.Base(e.Name) != name {
+					continue
 				}
 				ds.logger.Info(
 					"fs event",
 					zap.Stringer("event", e.Op),
 					zap.String("file", e.Name),
 				)
+				reloadTimer.Reset(time.Second)
 
-				if delayReloadTimer != nil {
-					delayReloadTimer.Reset(time.Second)
+			case <-reloadTimer.C:
+				ds.logger.Info(
+					"reloading file",
+					zap.String("file", ds.file),
+				)
+				if v, err := ds.loadFromDisk(); err != nil {
+					ds.logger.Error(
+						"failed to reload file",
+						zap.String("file", ds.file),
+						zap.Error(err),
+					)
 				} else {
-					delayReloadTimer = time.AfterFunc(time.Second, func() {
-						if hasOp(e, fsnotify.Remove) {
-							_ = w.Remove(ds.file)
-							if err := w.Add(ds.file); err != nil {
-								ds.logger.Error(
-									"failed to re-watch file, auto reload may not work anymore",
-									zap.String("file", ds.file),
-									zap.Error(err),
-								)
-							}
-						}
-
-						ds.logger.Info(
-							"reloading file",
-							zap.String("file", ds.file),
-						)
-						if v, err := ds.loadFromDisk(); err != nil {
-							ds.logger.Error(
-								"failed to reload file",
-								zap.String("file", ds.file),
-								zap.Error(err),
-							)
-						} else {
-							ds.logger.Info(
-								"file reloaded",
-								zap.String("file", ds.file),
-							)
-							ds.pushData(v)
-						}
-
-						delayReloadTimer = nil
-					})
+					ds.logger.Info(
+						"file reloaded",
+						zap.String("file", ds.file),
+					)
+					ds.pushData(v)
 				}
 
 			case err, ok := <-w.Errors:
-				if delayReloadTimer != nil {
-					delayReloadTimer.Stop()
-					delayReloadTimer = nil
-				}
 				if !ok {
 					return
 				}
 				ds.logger.Error("fs notify error", zap.Error(err))
 			case <-ds.sc.ReceiveCloseSignal():
-				if delayReloadTimer != nil {
-					delayReloadTimer.Stop()
-					delayReloadTimer = nil
-				}
 				return
 			}
 		}
 	}()
 	return nil
-}
-
-func hasOp(e fsnotify.Event, op fsnotify.Op) bool {
-	return e.Op&op == op
 }
