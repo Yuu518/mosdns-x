@@ -203,6 +203,7 @@ func (t *Transport) exchangeWithPipelineConn(ctx context.Context, m *dns.Msg) (*
 
 		if err != nil {
 			if !isNewConn && attempt <= maxRetry {
+				latestErr = err
 				continue
 			}
 			return nil, err
@@ -268,6 +269,7 @@ func (t *Transport) exchangeWithReusableConn(ctx context.Context, m *dns.Msg) (*
 		t.releaseReusableConn(conn, err)
 		if err != nil {
 			if !isNewConn && attempt <= maxRetry {
+				latestErr = err
 				continue
 			}
 			return nil, err
@@ -480,7 +482,7 @@ func (dc *dnsConn) exchange(ctx context.Context, q *dns.Msg) (*dns.Msg, error) {
 }
 
 func (dc *dnsConn) dialAndRead() {
-	dialCtx, cancel := context.WithTimeout(context.Background(), defaultDialTimeout)
+	dialCtx, cancel := context.WithTimeout(context.Background(), dc.t.opts.DialTimeout)
 	defer cancel()
 	c, err := dc.t.opts.DialFunc(dialCtx)
 	if err != nil {
