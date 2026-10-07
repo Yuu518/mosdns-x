@@ -66,7 +66,7 @@ func (opts *HPLimiterOpts) Init() error {
 		return fmt.Errorf("invalid ipv6 mask %d, should be 0~128", m)
 	}
 	utils.SetDefaultNum(&opts.IPv4Mask, 32)
-	utils.SetDefaultNum(&opts.IPv4Mask, 48)
+	utils.SetDefaultNum(&opts.IPv6Mask, 48)
 	return nil
 }
 
