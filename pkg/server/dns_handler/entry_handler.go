@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"testing"
 	"time"
 
 	"github.com/miekg/dns"
@@ -154,7 +153,6 @@ func (h *EntryHandler) responseFormErr(req *dns.Msg) *dns.Msg {
 }
 
 type DummyServerHandler struct {
-	T       *testing.T
 	WantMsg *dns.Msg
 	WantErr error
 }
