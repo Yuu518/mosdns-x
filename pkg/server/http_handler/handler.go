@@ -28,7 +28,6 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
-	"reflect"
 	"strings"
 
 	"github.com/miekg/dns"
@@ -52,7 +51,7 @@ type HandlerOpts struct {
 	Path string
 
 	// SrcIPHeader specifies the header that contain client source address.
-	// "True-Client-IP" "X-Real-IP" "X-Forwarded-For" will parse automatically.
+	// If it is empty, no header will be trusted.
 	SrcIPHeader string
 
 	// Logger specifies the logger which Handler writes its log to.
@@ -247,27 +246,10 @@ func (h *Handler) ServeHTTP(w ResponseWriter, req Request) {
 }
 
 func getRemoteAddr(req Request, customHeader string) (netip.Addr, error) {
-	if tcip := req.Header().Get("True-Client-IP"); tcip != "" {
-		if addr, err := netip.ParseAddr(tcip); err == nil {
-			req.SetRemoteAddr(tcip)
-			return addr, nil
-		}
-	}
-	if xrip := req.Header().Get("X-Real-IP"); xrip != "" {
-		if addr, err := netip.ParseAddr(xrip); err == nil {
-			req.SetRemoteAddr(xrip)
-			return addr, nil
-		}
-	}
-	if xff := req.Header().Get("X-Forwarded-For"); xff != "" {
-		ip, _, _ := strings.Cut(xff, ",")
-		if addr, err := netip.ParseAddr(ip); err == nil {
-			req.SetRemoteAddr(ip)
-			return addr, nil
-		}
-	}
-	if customHeader != "" && !contain([]string{"True-Client-IP", "X-Real-IP", "X-Forwarded-For"}, customHeader) {
-		if ip := req.Header().Get(customHeader); ip != "" {
+	if customHeader != "" {
+		if v := req.Header().Get(customHeader); v != "" {
+			ip, _, _ := strings.Cut(v, ",")
+			ip = strings.TrimSpace(ip)
 			if addr, err := netip.ParseAddr(ip); err == nil {
 				req.SetRemoteAddr(ip)
 				return addr, nil
@@ -279,13 +261,4 @@ func getRemoteAddr(req Request, customHeader string) (netip.Addr, error) {
 		return netip.Addr{}, err
 	}
 	return addrport.Addr(), nil
-}
-
-func contain[T any](arr []T, it T) bool {
-	for _, item := range arr {
-		if reflect.DeepEqual(it, item) {
-			return true
-		}
-	}
-	return false
 }
