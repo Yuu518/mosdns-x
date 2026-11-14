@@ -130,18 +130,7 @@ func NewUpstream(addr string, opt *Opt) (Upstream, error) {
 		return nil, fmt.Errorf("invalid server address, %w", err)
 	}
 
-	d, err := D.NewDialer(D.DialerOpts{
-		Dialer: &net.Dialer{
-			Resolver: bootstrap.NewPlainBootstrap(opt.Bootstrap),
-			Control: getSocketControlFunc(socketOpts{
-				so_mark:        opt.SoMark,
-				bind_to_device: opt.BindToDevice,
-			}),
-		},
-		SocksAddr:  opt.Socks5,
-		S5Username: opt.S5Username,
-		S5Password: opt.S5Password,
-	})
+	d, err := NewDialer(opt)
 	if err != nil {
 		return nil, err
 	}
@@ -303,6 +292,24 @@ func NewUpstream(addr string, opt *Opt) (Upstream, error) {
 	default:
 		return nil, fmt.Errorf("unsupported protocol [%s]", addrURL.Scheme)
 	}
+}
+
+func NewDialer(opt *Opt) (D.Dialer, error) {
+	if opt == nil {
+		opt = new(Opt)
+	}
+	return D.NewDialer(D.DialerOpts{
+		Dialer: &net.Dialer{
+			Resolver: bootstrap.NewPlainBootstrap(opt.Bootstrap),
+			Control: getSocketControlFunc(socketOpts{
+				so_mark:        opt.SoMark,
+				bind_to_device: opt.BindToDevice,
+			}),
+		},
+		SocksAddr:  opt.Socks5,
+		S5Username: opt.S5Username,
+		S5Password: opt.S5Password,
+	})
 }
 
 func createTLSConfig(opt *Opt, alpn string, serverName string) *tls.Config {

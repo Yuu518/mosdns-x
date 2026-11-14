@@ -40,6 +40,7 @@ import (
 	_ "github.com/pmkol/mosdns-x/plugin/executable/no_cname"
 	_ "github.com/pmkol/mosdns-x/plugin/executable/padding"
 	_ "github.com/pmkol/mosdns-x/plugin/executable/query_summary"
+	_ "github.com/pmkol/mosdns-x/plugin/executable/recursive"
 	_ "github.com/pmkol/mosdns-x/plugin/executable/redirect"
 	_ "github.com/pmkol/mosdns-x/plugin/executable/reject_any"
 	_ "github.com/pmkol/mosdns-x/plugin/executable/reverse_lookup"
